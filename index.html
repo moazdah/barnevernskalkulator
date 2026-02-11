@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Økonomisk analyseverktøy – Barnevernsinstitusjon (omsorg)</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <!-- Chart.js CDN (frontend only, works on GitHub Pages) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand__title">Økonomisk analyseverktøy</div>
+      <div class="brand__subtitle">Barnevernsinstitusjon (omsorg) – bemanning, budsjett, prognose, scenarioer</div>
+    </div>
+    <div class="topbar__actions">
+      <button id="btnExport" class="btn btn--ghost">Eksporter JSON</button>
+      <label class="btn btn--ghost">
+        Importer JSON
+        <input id="fileImport" type="file" accept="application/json" hidden />
+      </label>
+      <button id="btnReset" class="btn btn--danger">Nullstill</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <nav class="tabs" aria-label="Navigasjon">
+        <button class="tab is-active" data-tab="inputs">Inndata</button>
+        <button class="tab" data-tab="results">Resultater</button>
+        <button class="tab" data-tab="scenarios">Scenarioer</button>
+        <button class="tab" data-tab="sources">Kilder</button>
+      </nav>
+
+      <section class="help">
+        <h3>Standard antakelser</h3>
+        <ul class="bullets">
+          <li>1 ansatt per ungdom på vakt samtidig</li>
+          <li>3 7 4 7 turnus gir turnusfaktor 3,00 (21 dager / 7 arbeidsdager)</li>
+          <li>Nattevaktordning kan settes som fast antall per natt eller per ungdom</li>
+          <li>Offentlig sats er forhåndsutfylt med 2026 sats (kan endres)</li>
+        </ul>
+        <p class="muted small">
+          Dette er et analyseverktøy. Faktiske avtaler, bemanningskrav og satser kan avvike.
+        </p>
+      </section>
+    </aside>
+
+    <section class="content">
+      <!-- INNDATA -->
+      <div id="tab-inputs" class="tabpanel">
+        <div class="grid">
+          <section class="card">
+            <h2>Bemanning</h2>
+
+            <div class="row">
+              <label>Antall ungdom</label>
+              <input id="youthCount" type="number" min="1" max="20" step="1" />
+            </div>
+
+            <div class="row">
+              <label>1 ansatt per ungdom (på vakt samtidig)</label>
+              <input id="staffPerYouth" type="number" min="0.5" max="3" step="0.1" />
+            </div>
+
+            <div class="row">
+              <label>Turnusmodell</label>
+              <select id="turnusModel">
+                <option value="3747">3, 7, 4, 7 (3 på, 7 fri, 4 på, 7 fri)</option>
+                <option value="custom">Egendefinert</option>
+              </select>
+            </div>
+
+            <div class="row row--2">
+              <div>
+                <label>Turnus syklus (dager)</label>
+                <input id="turnusCycleDays" type="number" min="7" max="60" step="1" />
+              </div>
+              <div>
+                <label>Arbeidsdager i syklus</label>
+                <input id="turnusWorkDays" type="number" min="1" max="30" step="1" />
+              </div>
+            </div>
+
+            <div class="row">
+              <label>Turnusfaktor (auto)</label>
+              <input id="turnusFactor" type="text" readonly />
+              <div class="hint">Turnusfaktor = syklusdager / arbeidsdager. Brukes til å beregne hvor mange ansatte som trengs for å dekke én posisjon hele perioden.</div>
+            </div>
+
+            <hr />
+
+            <h3>Nattevaktordning</h3>
+
+            <div class="row">
+              <label>Modus</label>
+              <select id="nightMode">
+                <option value="fixed">Fast antall nattevakter per natt</option>
+                <option value="perYouth">Nattevakter per ungdom (ratio)</option>
+              </select>
+            </div>
+
+            <div class="row row--2">
+              <div>
+                <label>Fast nattevakter per natt</label>
+                <input id="nightFixedPerNight" type="number" min="0" max="10" step="1" />
+              </div>
+              <div>
+                <label>Ratio (nattevakt per X ungdom)</label>
+                <input id="nightPerYouthRatio" type="number" min="1" max="20" step="1" />
+              </div>
+            </div>
+
+            <div class="row">
+              <label>FTE nattevakt dekning</label>
+              <input id="nightCoverageFactor" type="number" min="1" max="6" step="0.1" />
+              <div class="hint">Hvor mange ansatte som trengs for å dekke én nattevakt hver natt. Standard 3,00 kan brukes som grov tommelfinger for 3 7 4 7.</div>
+            </div>
+          </section>
+
+          <section class="card">
+            <h2>Lønn og sosiale kostnader</h2>
+
+            <div class="row row--2">
+              <div>
+                <label>Årslønn døgnansatt (kr)</label>
+                <input id="salaryDayAnnual" type="number" min="0" step="1000" />
+              </div>
+              <div>
+                <label>Årslønn nattevakt (kr)</label>
+                <input id="salaryNightAnnual" type="number" min="0" step="1000" />
+              </div>
+            </div>
+
+            <div class="row row--2">
+              <div>
+                <label>Arbeidsgiveravgift (%)</label>
+                <input id="employerTaxPct" type="number" min="0" max="25" step="0.1" />
+                <div class="hint">Standard er ofte 14,1 prosent (sone 1). Se Kilder.</div>
+              </div>
+              <div>
+                <label>OTP pensjon (%)</label>
+                <input id="otpPct" type="number" min="0" max="10" step="0.1" />
+                <div class="hint">Minimum 2 prosent er vanlig minimumskrav. Se Kilder.</div>
+              </div>
+            </div>
+
+            <div class="row">
+              <label>Feriepenger</label>
+              <select id="holidayPayPct">
+                <option value="10.2">10,2 % (minimum)</option>
+                <option value="12" selected>12 % (vanlig ved 5 uker)</option>
+                <option value="12.5">12,5 % (over 60 år min)</option>
+                <option value="14.3">14,3 % (over 60 år ved 5 uker)</option>
+              </select>
+            </div>
+
+            <div class="row">
+              <label>Andre sosiale kostnader (%)</label>
+              <input id="otherSocialPct" type="number" min="0" max="20" step="0.1" />
+              <div class="hint">Valgfritt påslag for forsikringer, AFP, opplæring og lignende.</div>
+            </div>
+          </section>
+
+          <section class="card">
+            <h2>Kostnadsstruktur</h2>
+
+            <div class="row row--2">
+              <div>
+                <label>Husleie (kr per måned)</label>
+                <input id="rentMonthly" type="number" min="0" step="500" />
+              </div>
+              <div>
+                <label>Mat per ungdom (kr per måned)</label>
+                <input id="foodPerYouthMonthly" type="number" min="0" step="100" />
+              </div>
+            </div>
+
+            <div class="row row--2">
+              <div>
+                <label>Bil (kr per måned)</label>
+                <input id="carMonthly" type="number" min="0" step="500" />
+              </div>
+              <div>
+                <label>Andre driftskostnader (kr per måned)</label>
+                <input id="otherOpsMonthly" type="number" min="0" step="500" />
+              </div>
+            </div>
+
+            <div class="row">
+              <label>Strøm, internett, forsikringer, admin (kr per måned)</label>
+              <input id="utilitiesMonthly" type="number" min="0" step="500" />
+            </div>
+          </section>
+
+          <section class="card">
+            <h2>Inntekter</h2>
+
+            <div class="row row--2">
+              <div>
+                <label>Offentlig sats per ungdom (kr per måned)</label>
+                <input id="publicRatePerYouthMonthly" type="number" min="0" step="1000" />
+              </div>
+              <div>
+                <label>Tilleggsatser (kr per ungdom per måned)</label>
+                <input id="addOnRatePerYouthMonthly" type="number" min="0" step="500" />
+              </div>
+            </div>
+
+            <div class="row">
+              <label>Andre tilskudd og støtte (kr per måned)</label>
+              <input id="grantsMonthly" type="number" min="0" step="1000" />
+              <div class="hint">Bruk dette til prosjektmidler eller støtteordninger dere faktisk har tilgang til.</div>
+            </div>
+          </section>
+
+          <section class="card">
+            <h2>Likviditet og betalingsbetingelser</h2>
+
+            <div class="row row--2">
+              <div>
+                <label>Startkontanter (kr)</label>
+                <input id="startingCash" type="number" min="0" step="10000" />
+              </div>
+              <div>
+                <label>Kontantbuffer mål (mnd kostnader)</label>
+                <input id="targetCashBufferMonths" type="number" min="0" max="24" step="0.5" />
+              </div>
+            </div>
+
+            <div class="row row--2">
+              <div>
+                <label>Innbetalingstid (dager)</label>
+                <input id="receivableDays" type="number" min="0" max="120" step="1" />
+              </div>
+              <div>
+                <label>Betalingstid leverandører (dager)</label>
+                <input id="payableDays" type="number" min="0" max="120" step="1" />
+              </div>
+            </div>
+
+            <div class="row">
+              <label>Prognoseperiode (måneder)</label>
+              <input id="forecastMonths" type="number" min="6" max="60" step="1" />
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- RESULTATER -->
+      <div id="tab-results" class="tabpanel is-hidden">
+        <div class="grid">
+          <section class="card">
+            <h2>Nøkkeltall</h2>
+            <div id="kpiGrid" class="kpis"></div>
+            <div class="note small muted">
+              Likviditetsgrad her er en praktisk modell basert på kontanter og beregnet KGD (kortsiktig gjeld) fra betalingsbetingelser.
+            </div>
+          </section>
+
+          <section class="card">
+            <h2>Månedlig oversikt</h2>
+            <div class="tablewrap">
+              <table class="table" id="monthlyTable">
+                <thead>
+                  <tr>
+                    <th>Måned</th>
+                    <th>Omsetning</th>
+                    <th>Totale kostnader</th>
+                    <th>Driftsresultat</th>
+                    <th>Kontantbeholdning</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="card">
+            <h2>Grafer</h2>
+            <div class="chartgrid">
+              <div class="chartcard">
+                <div class="charttitle">Inntekter vs kostnader</div>
+                <canvas id="chartRevenueCosts"></canvas>
+              </div>
+              <div class="chartcard">
+                <div class="charttitle">Kontantbeholdning</div>
+                <canvas id="chartCash"></canvas>
+              </div>
+              <div class="chartcard">
+                <div class="charttitle">Resultatmargin</div>
+                <canvas id="chartMargin"></canvas>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- SCENARIOER -->
+      <div id="tab-scenarios" class="tabpanel is-hidden">
+        <section class="card">
+          <h2>Scenarioanalyse</h2>
+          <div class="row row--2">
+            <div>
+              <label>Scenario navn</label>
+              <input id="scenarioName" type="text" placeholder="For eksempel: 4 ungdom, høyere lønn" />
+            </div>
+            <div class="scenarioButtons">
+              <button id="btnSaveScenario" class="btn">Lagre scenario</button>
+              <button id="btnDuplicateScenario" class="btn btn--ghost">Dupliser aktiv</button>
+            </div>
+          </div>
+
+          <div class="row">
+            <label>Lagrede scenarioer</label>
+            <div id="scenarioList" class="scenarioList"></div>
+          </div>
+
+          <p class="muted small">
+            Scenarioer lagres i nettleseren (localStorage). Eksport fungerer om du vil versjonere scenarioer i repo.
+          </p>
+        </section>
+      </div>
+
+      <!-- KILDER -->
+      <div id="tab-sources" class="tabpanel is-hidden">
+        <section class="card">
+          <h2>Kilder og referanser</h2>
+          <div id="sourcesList"></div>
+          <p class="muted small">
+            Oppdater satser når dere får avtaler, rammeavtaler eller spesifikke kommunale kjøpspriser.
+          </p>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="muted small">
+      Bygget for økonomisk modellering av omsorgsinstitusjon. Tall kan endres dynamisk og scenarioer kan lagres.
+    </div>
+  </footer>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
